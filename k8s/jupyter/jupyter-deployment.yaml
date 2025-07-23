@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jupyter-config
+  namespace: jupyter
+data:
+  jupyter_notebook_config.py: |
+    import os
+    
+    # Basic configuration
+    c.NotebookApp.ip = '0.0.0.0'
+    c.NotebookApp.port = 8888
+    c.NotebookApp.open_browser = False
+    c.NotebookApp.token = os.environ.get('JUPYTER_TOKEN', '')
+    c.NotebookApp.password = ''
+    c.NotebookApp.allow_root = True
+    c.NotebookApp.notebook_dir = '/home/jovyan/work'
+    
+    # Security settings
+    c.NotebookApp.allow_origin = '*'
+    c.NotebookApp.disable_check_xsrf = True
+    
+    # Kernel settings
+    c.KernelManager.autorestart = True
+    
+    # Extensions
+    c.NotebookApp.nbserver_extensions = {
+        'elyra': True
+    }
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jupyter-workspace
+  namespace: jupyter
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jupyter-lab
+  namespace: jupyter
+  labels:
+    app: jupyter-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jupyter-lab
+  template:
+    metadata:
+      labels:
+        app: jupyter-lab
+    spec:
+      containers:
+      - name: jupyter-lab
+        image: jupyter/all-spark-notebook:spark-3.5.0
+        ports:
+        - containerPort: 8888
+          name: jupyter
+        env:
+        - name: JUPYTER_ENABLE_LAB
+          value: "yes"
+        - name: JUPYTER_TOKEN
+          value: "datascience123"
+        - name: GRANT_SUDO
+          value: "yes"
+        - name: CHOWN_HOME
+          value: "yes"
+        command:
+        - start-notebook.sh
+        - --NotebookApp.config_file=/etc/jupyter/jupyter_notebook_config.py
+        - --NotebookApp.token=datascience123
+        - --NotebookApp.password=''
+        volumeMounts:
+        - name: workspace
+          mountPath: /home/jovyan/work
+        - name: config
+          mountPath: /etc/jupyter
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+        # Install additional packages on startup
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                pip install --quiet papermill elyra[all] kubernetes boto3 apache-airflow-client
+                jupyter server extension enable elyra
+                jupyter lab build --dev-build=False --minimize=False
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: jupyter-workspace
+      - name: config
+        configMap:
+          name: jupyter-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jupyter-lab-service
+  namespace: jupyter
+  labels:
+    app: jupyter-lab
+spec:
+  type: NodePort
+  ports:
+  - port: 8888
+    targetPort: 8888
+    nodePort: 30888
+    name: jupyter
+  selector:
+    app: jupyter-lab

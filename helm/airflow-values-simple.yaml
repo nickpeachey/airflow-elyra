@@ -1,0 +1,79 @@
+# Minimal Airflow Configuration
+nameOverride: "airflow"
+fullnameOverride: "airflow"
+
+# Use LocalExecutor instead of KubernetesExecutor to avoid DAG distribution issues
+executor: "LocalExecutor"
+
+# Use built-in PostgreSQL
+postgresql:
+  enabled: true
+
+# Enable Redis for LocalExecutor
+redis:
+  enabled: true
+
+# Disable DAG persistence - copy manually instead
+dags:
+  persistence:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false
+
+# Configure Airflow settings via config
+config:
+  logging:
+    remote_logging: "True"
+    remote_base_log_folder: "s3://airflow-logs"
+    remote_log_conn_id: "aws_default"
+
+# Add environment variables for LocalStack
+env:
+  - name: AIRFLOW__LOGGING__REMOTE_LOGGING
+    value: "True"
+  - name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER
+    value: "s3://airflow-logs"
+  - name: AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID
+    value: "aws_default"
+  - name: AWS_ACCESS_KEY_ID
+    value: "test"
+  - name: AWS_SECRET_ACCESS_KEY
+    value: "test"
+  - name: AWS_DEFAULT_REGION
+    value: "us-east-1"
+  - name: AWS_ENDPOINT_URL
+    value: "http://localstack-service.localstack.svc.cluster.local:4566"
+
+# Use existing service account
+serviceAccount:
+  create: false
+  name: airflow
+
+webserver:
+  serviceAccount:
+    create: false
+    name: airflow
+
+scheduler:
+  serviceAccount:
+    create: false
+    name: airflow
+
+triggerer:
+  serviceAccount:
+    create: false
+    name: airflow
+
+# Default admin user
+defaultUser:
+  enabled: true
+  role: Admin
+  username: admin
+  password: admin
+
+# Airflow configuration for LocalExecutor
+airflow:
+  config:
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"

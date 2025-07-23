@@ -1,0 +1,98 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: sales-data-processor-{{ ds_nodash }}
+  namespace: default
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: "apache/spark:3.5.5"
+  imagePullPolicy: Always
+  mainApplicationFile: local:///app/spark_s3_job.py
+  sparkVersion: "3.5.5"
+  restartPolicy:
+    type: Never
+  deps:
+    jars:
+      - "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar"
+      - "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar"
+  volumes:
+    - name: spark-job-volume
+      configMap:
+        name: spark-job-code
+  driver:
+    cores: 1
+    memory: "1g"
+    serviceAccount: spark-operator-spark
+    labels: {}
+    securityContext:
+      runAsUser: 185
+      runAsGroup: 185
+      fsGroup: 185
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        value: test
+      - name: AWS_SECRET_ACCESS_KEY
+        value: test
+      - name: AWS_ENDPOINT_URL
+        value: http://localstack-service.localstack.svc.cluster.local:4566
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      - name: SPARK_USER
+        value: spark
+      - name: HADOOP_USER_NAME
+        value: spark
+    volumeMounts:
+      - name: spark-job-volume
+        mountPath: /app
+  executor:
+    cores: 1
+    instances: 1
+    memory: "1g"
+    labels: {}
+    securityContext:
+      runAsUser: 185
+      runAsGroup: 185
+      fsGroup: 185
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        value: test
+      - name: AWS_SECRET_ACCESS_KEY
+        value: test
+      - name: AWS_ENDPOINT_URL
+        value: http://localstack-service.localstack.svc.cluster.local:4566
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      - name: SPARK_USER
+        value: spark
+      - name: HADOOP_USER_NAME
+        value: spark
+    volumeMounts:
+      - name: spark-job-volume
+        mountPath: /app
+  sparkConf:
+    "spark.hadoop.fs.s3a.endpoint": "http://localstack-service.localstack.svc.cluster.local:4566"
+    "spark.hadoop.fs.s3a.access.key": "test"
+    "spark.hadoop.fs.s3a.secret.key": "test"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "spark.hadoop.fs.s3a.connection.ssl.enabled": "false"
+    "spark.sql.adaptive.enabled": "true"
+    "spark.sql.adaptive.coalescePartitions.enabled": "true"
+    # Security configurations to avoid Kerberos issues
+    "spark.authenticate": "false"
+    "spark.hadoop.hadoop.security.authentication": "simple"
+    "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+    "spark.hadoop.hadoop.security.authorization": "false"
+    "spark.sql.warehouse.dir": "/tmp/spark-warehouse"
+    # Kubernetes and filesystem configurations
+    "spark.kubernetes.container.image.pullPolicy": "Always"
+    "spark.kubernetes.authenticate.driver.serviceAccountName": "spark-operator-spark"
+    "spark.kubernetes.namespace": "default"
+    # Executor failure tolerance
+    "spark.kubernetes.executor.deleteOnTermination": "false"
+    "spark.task.maxFailures": "1"
+    "spark.kubernetes.executor.podNamePrefix": "spark-exec"
+    # User configuration
+    "spark.sql.execution.arrow.pyspark.enabled": "false"

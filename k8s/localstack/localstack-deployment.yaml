@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: localstack
+  labels:
+    app: localstack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+      - name: localstack
+        image: localstack/localstack:3.0
+        ports:
+        - containerPort: 4566
+          name: localstack
+        env:
+        - name: SERVICES
+          value: "s3,sqs,sns,lambda,dynamodb,cloudformation,iam,sts"
+        - name: DEBUG
+          value: "1"
+        - name: DATA_DIR
+          value: "/var/lib/localstack/data"
+        - name: HOSTNAME_EXTERNAL
+          value: "localhost"
+        - name: PERSISTENCE
+          value: "1"
+        volumeMounts:
+        - name: localstack-data
+          mountPath: /var/lib/localstack/data
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 2Gi
+        readinessProbe:
+          httpGet:
+            path: /_localstack/health
+            port: 4566
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /_localstack/health
+            port: 4566
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: localstack-data
+        persistentVolumeClaim:
+          claimName: localstack-data
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: localstack-data
+  namespace: localstack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack-service
+  namespace: localstack
+  labels:
+    app: localstack
+spec:
+  type: NodePort
+  ports:
+  - port: 4566
+    targetPort: 4566
+    nodePort: 30566
+    name: localstack
+  selector:
+    app: localstack
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localstack-init
+  namespace: localstack
+data:
+  init.sh: |
+    #!/bin/bash
+    
+    # Wait for LocalStack to be ready
+    echo "Waiting for LocalStack to be ready..."
+    until curl -s http://localhost:4566/_localstack/health | grep -q "running"; do
+      sleep 5
+    done
+    
+    # Create S3 buckets
+    aws --endpoint-url=http://localhost:4566 s3 mb s3://data-lake
+    aws --endpoint-url=http://localhost:4566 s3 mb s3://processed-data
+    aws --endpoint-url=http://localhost:4566 s3 mb s3://notebooks
+    
+    # Create SQS queues
+    aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name data-processing-queue
+    
+    echo "LocalStack initialization completed!"

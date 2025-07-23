@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # For development purposes - can be used instead of Kubernetes
+  # This docker-compose provides a simpler alternative for local development
+  
+  localstack:
+    image: localstack/localstack:3.0
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs,sns,lambda,dynamodb
+      - DEBUG=1
+      - DATA_DIR=/var/lib/localstack/data
+      - HOSTNAME_EXTERNAL=localhost
+    volumes:
+      - localstack_data:/var/lib/localstack/data
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  jupyter:
+    image: jupyter/all-spark-notebook:spark-3.5.0
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=datascience123
+      - GRANT_SUDO=yes
+    volumes:
+      - ./notebooks:/home/jovyan/work/notebooks
+      - ./spark-apps:/home/jovyan/work/spark-apps
+      - jupyter_data:/home/jovyan/work/data
+    command: start-notebook.sh --NotebookApp.token=datascience123
+
+volumes:
+  localstack_data:
+  postgres_data:
+  redis_data:
+  jupyter_data:

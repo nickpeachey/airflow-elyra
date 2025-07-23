@@ -1,0 +1,108 @@
+# Spark Operator Helm Chart Values (Kubeflow)
+# This configuration sets up the Spark Operator for Kubernetes-native Spark jobs
+# Using the official Kubeflow Spark Operator chart
+
+# Basic configuration
+nameOverride: "spark-operator"
+fullnameOverride: "spark-operator"
+
+# Image configuration
+image:
+  repository: kubeflow/spark-operator
+  tag: 
+  pullPolicy: IfNotPresent
+
+# Spark job namespace - allow jobs in multiple namespaces
+sparkJobNamespace: ""
+watchNamespace: ""
+
+# Enable webhook for automatic sidecar injection
+webhook:
+  enable: true
+  port: 8080
+  namespaceSelector: {}
+  objectSelector: {}
+
+# Controller configuration
+controller:
+  replicas: 1
+  logLevel: 2
+  
+# Resource configuration
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Service account
+serviceAccount:
+  create: true
+  name: "spark-operator"
+  annotations: {}
+
+# RBAC - enable cluster-wide permissions
+rbac:
+  create: true
+  createClusterRole: true
+  createRole: true
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 185
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 185
+
+# Enable batch scheduler integration
+batchScheduler:
+  enable: false
+
+# Monitoring and metrics
+metrics:
+  enable: true
+  port: 10254
+  endpoint: /metrics
+  portName: metrics
+
+# Leader election
+leaderElection:
+  lockName: "spark-operator-lock"
+  lockNamespace: "spark"
+
+# Spark application CRD configuration
+sparkApplications:
+  # Enable garbage collection of completed applications
+  enableGarbageCollection: true
+  # Maximum age of completed applications (in seconds)
+  maxApplicationAge: 86400  # 24 hours
+
+# Ingress configuration (disabled by default)
+ingress:
+  enabled: false
+
+# Istio configuration
+istio:
+  enabled: false
+
+# Prometheus monitoring
+prometheus:
+  jmxExporterJar:
+    enable: true
+
+# Pod disruption budget
+podDisruptionBudget:
+  enable: false
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

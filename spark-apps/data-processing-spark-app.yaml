@@ -1,0 +1,119 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: data-processing-job
+  namespace: spark
+spec:
+  type: Scala
+  mode: cluster
+  image: "gcr.io/spark-operator/spark:v3.1.1"
+  imagePullPolicy: Always
+  mainClass: org.apache.spark.examples.SparkPi
+  mainApplicationFile: "local:///opt/spark/examples/jars/spark-examples_2.12-3.1.1.jar"
+  sparkVersion: "3.1.1"
+  restartPolicy:
+    type: Never
+  volumes:
+    - name: "test-volume"
+      hostPath:
+        path: "/tmp"
+        type: Directory
+  driver:
+    cores: 1
+    coreLimit: "1200m"
+    memory: "512m"
+    labels:
+      version: 3.1.1
+    serviceAccount: spark-operator
+    volumeMounts:
+      - name: "test-volume"
+        mountPath: "/tmp"
+  executor:
+    cores: 1
+    instances: 2
+    memory: "512m"
+    labels:
+      version: 3.1.1
+    volumeMounts:
+      - name: "test-volume"
+        mountPath: "/tmp"
+  monitoring:
+    exposeDriverMetrics: true
+    exposeExecutorMetrics: true
+    prometheus:
+      jmxExporterJar: "/prometheus/jmx_prometheus_javaagent-0.11.0.jar"
+      port: 8090
+
+---
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: pyspark-data-processing
+  namespace: spark
+spec:
+  type: Python
+  mode: cluster
+  image: "apache/spark-py:v3.5.0"
+  imagePullPolicy: Always
+  mainApplicationFile: "s3a://data-lake/spark-jobs/data_processing.py"
+  sparkVersion: "3.5.0"
+  hadoopConf:
+    "fs.s3a.endpoint": "http://localstack-service.localstack.svc.cluster.local:4566"
+    "fs.s3a.access.key": "test"
+    "fs.s3a.secret.key": "test"
+    "fs.s3a.path.style.access": "true"
+    "fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+  sparkConf:
+    "spark.sql.adaptive.enabled": "true"
+    "spark.sql.adaptive.coalescePartitions.enabled": "true"
+    "spark.sql.adaptive.skewJoin.enabled": "true"
+    "spark.kubernetes.container.image.pullPolicy": "Always"
+    "spark.kubernetes.namespace": "spark"
+    "spark.kubernetes.authenticate.driver.serviceAccountName": "spark-operator"
+    "spark.hadoop.fs.s3a.endpoint": "http://localstack-service.localstack.svc.cluster.local:4566"
+    "spark.hadoop.fs.s3a.access.key": "test"
+    "spark.hadoop.fs.s3a.secret.key": "test"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+  restartPolicy:
+    type: OnFailure
+    onFailureRetries: 3
+    onFailureRetryInterval: 10
+    onSubmissionFailureRetries: 5
+    onSubmissionFailureRetryInterval: 20
+  driver:
+    cores: 1
+    coreLimit: "1200m"
+    memory: "1g"
+    memoryOverhead: "512m"
+    labels:
+      version: 3.5.0
+      app: data-processing
+    serviceAccount: spark-operator
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        value: "test"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "test"
+      - name: AWS_DEFAULT_REGION
+        value: "us-east-1"
+  executor:
+    cores: 1
+    instances: 2
+    memory: "1g"
+    memoryOverhead: "512m"
+    labels:
+      version: 3.5.0
+      app: data-processing
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        value: "test"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "test"
+      - name: AWS_DEFAULT_REGION
+        value: "us-east-1"
+  monitoring:
+    exposeDriverMetrics: true
+    exposeExecutorMetrics: true
+    prometheus:
+      jmxExporterJar: "/opt/jmx_prometheus_javaagent.jar"
+      port: 8090

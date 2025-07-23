@@ -1,0 +1,125 @@
+# Airflow Helm Chart Values
+# This configuration sets up Airflow with:
+# - PostgreSQL as metadata database
+# - Redis as message broker
+# - CeleryExecutor for distributed task execution
+# - PVC for DAGs and logs persistence
+
+# Basic configuration
+nameOverride: "airflow"
+fullnameOverride: "airflow"
+
+# Airflow configuration
+airflow:
+  config:
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__ENABLE_XCOM_PICKLING: "true"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    AIRFLOW__WEBSERVER__RBAC: "true"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    AIRFLOW__KUBERNETES__NAMESPACE: "airflow"
+    AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY: "apache/airflow"
+    AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG: "2.8.1"
+    AIRFLOW__KUBERNETES__DAGS_IN_IMAGE: "false"
+    AIRFLOW__KUBERNETES__DELETE_WORKER_PODS: "true"
+    AIRFLOW__KUBERNETES__DELETE_WORKER_PODS_ON_SUCCESS: "true"
+
+# Executor configuration (use LocalExecutor for simplicity)
+executor: "KubernetesExecutor"
+
+# Database configuration (use built-in PostgreSQL)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "airflow"
+    database: "airflow"
+  primary:
+    persistence:
+      size: 2Gi
+
+# Redis configuration (disable for LocalExecutor)
+redis:
+  enabled: false
+
+# Web server configuration
+webserver:
+  service:
+    type: NodePort
+    ports:
+      - name: airflow-ui
+        port: 8080
+        protocol: TCP
+        targetPort: 8080
+        nodePort: 30080
+  
+  # Service account for webserver
+  serviceAccount:
+    create: false
+    name: airflow
+
+# Scheduler configuration
+scheduler:
+  serviceAccount:
+    create: false
+    name: airflow
+
+# Triggerer configuration
+triggerer:
+  serviceAccount:
+    create: false
+    name: airflow
+
+# Persistent volumes for DAGs and logs
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false
+
+# Default user configuration
+defaultUser:
+  enabled: true
+  role: Admin
+  username: admin
+  email: admin@example.com
+  firstName: Admin
+  lastName: User
+  password: admin
+
+# RBAC configuration
+rbac:
+  create: false
+
+# Service account configuration
+serviceAccount:
+  create: false
+  name: airflow
+
+# Security context
+securityContext:
+  runAsUser: 50000
+  runAsGroup: 0
+  fsGroup: 0
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
