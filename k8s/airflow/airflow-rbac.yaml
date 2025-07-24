@@ -71,6 +71,46 @@ subjects:
   name: airflow
   namespace: airflow
 ---
+# Role for Airflow to work in default namespace (where Spark apps run)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-default-jobs
+  namespace: default
+  labels:
+    app.kubernetes.io/name: airflow
+    app.kubernetes.io/component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "services", "configmaps", "secrets"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: ["sparkoperator.k8s.io"]
+  resources: ["sparkapplications", "sparkapplications/status"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-default-jobs
+  namespace: default
+  labels:
+    app.kubernetes.io/name: airflow
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: airflow-default-jobs
+subjects:
+- kind: ServiceAccount
+  name: airflow
+  namespace: airflow
+- kind: ServiceAccount
+  name: airflow-worker
+  namespace: airflow
+---
 # Additional role for Airflow to work across namespaces
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -107,6 +147,9 @@ subjects:
 - kind: ServiceAccount
   name: airflow
   namespace: airflow
+- kind: ServiceAccount
+  name: airflow-worker
+  namespace: airflow
 ---
 # Role for Airflow to work in jupyter namespace
 apiVersion: rbac.authorization.k8s.io/v1
@@ -140,4 +183,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: airflow
+  namespace: airflow
+- kind: ServiceAccount
+  name: airflow-worker
   namespace: airflow

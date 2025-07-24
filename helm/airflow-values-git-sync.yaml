@@ -1,0 +1,146 @@
+# Airflow configuration with Git Sync for DAGs
+# This configuration pulls DAGs directly from GitHub
+
+# Use the official Airflow image
+defaultAirflowRepository: apache/airflow
+defaultAirflowTag: "2.10.5"
+
+# Airflow executor
+executor: "CeleryExecutor"
+
+# Enable Git Sync
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/nickpeachey/airflow-elyra
+    branch: main
+    rev: HEAD
+    depth: 1
+    # Sync every 60 seconds
+    wait: 60
+    subPath: "dags"
+
+# Web server configuration
+webserver:
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+  service:
+    type: ClusterIP
+    ports:
+      - name: airflow-ui
+        port: 8080
+
+# Redis configuration for Celery
+redis:
+  enabled: true
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  auth:
+    enablePostgresUser: true
+    postgresPassword: postgres
+    username: airflow
+    password: airflow
+    database: airflow
+
+# Enable logs persistence (disabled to avoid PVC issues)
+logs:
+  persistence:
+    enabled: false
+
+# Default admin user (same format as working simple config)
+defaultUser:
+  enabled: true
+  role: Admin
+  username: admin
+  password: admin
+
+# Airflow configuration
+config:
+  core:
+    # Enable pickle support for XCom
+    enable_xcom_pickling: 'True'
+    # Default timezone
+    default_timezone: 'UTC'
+    # Load examples
+    load_examples: 'False'
+    # Max active runs per DAG
+    max_active_runs_per_dag: 1
+  
+  webserver:
+    # Expose config in UI
+    expose_config: 'True'
+    # Enable RBAC
+    rbac: 'True'
+  
+  scheduler:
+    # DAG processing
+    dag_dir_list_interval: 60
+    catchup_by_default: 'False'
+    max_active_runs_per_dag: 1
+  
+  celery:
+    # Worker configuration
+    worker_concurrency: 4
+  
+  kubernetes:
+    # Enable Kubernetes integration
+    enable_tcp_keepalive: 'True'
+    in_cluster: 'True'
+    
+  # S3 logging configuration (disabled to avoid PVC issues)
+  logging:
+    remote_logging: 'False'
+
+# Environment variables for integrations (S3 logging disabled)
+env:
+  # LocalStack S3 configuration
+  - name: AWS_ACCESS_KEY_ID
+    value: "test"
+  - name: AWS_SECRET_ACCESS_KEY
+    value: "test"
+  - name: AWS_DEFAULT_REGION
+    value: "us-east-1"
+  - name: AWS_ENDPOINT_URL
+    value: "http://localstack-service.localstack.svc.cluster.local:4566"
+
+# Extra pip packages
+extraPipPackages:
+  - "apache-airflow-providers-cncf-kubernetes==8.4.0"
+  - "apache-airflow-providers-amazon==8.28.0"
+  - "boto3==1.35.36"
+
+# Service account configuration for Kubernetes jobs
+serviceAccount:
+  create: false
+  name: "airflow"
+
+# Worker configuration
+workers:
+  # Number of workers
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+
+# Scheduler configuration
+scheduler:
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"

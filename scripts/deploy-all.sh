@@ -70,24 +70,22 @@ kubectl cp "$PROJECT_ROOT/data/sales_data.csv" localstack/$(kubectl get pods -n 
 kubectl exec -n localstack deployment/localstack -- awslocal s3 cp /tmp/sales_data.csv s3://data-engineering-bucket/input/sales_data.csv
 
 # Deploy DAGs and notebooks
-echo -e "${YELLOW}📋 Deploying DAGs and notebooks...${NC}"
+echo -e "${YELLOW}📋 Setting up Git sync for DAGs...${NC}"
+"$PROJECT_ROOT/scripts/configure-git-sync.sh"
+
+echo -e "${YELLOW}📋 Deploying non-DAG content (notebooks)...${NC}"
 "$PROJECT_ROOT/scripts/deploy-content.sh"
 
-# Deploy SparkOperator specific DAGs
-echo -e "${YELLOW}⚡ Deploying SparkOperator DAGs...${NC}"
+# Configure Git sync and connections
+echo -e "${YELLOW}⚡ Configuring Airflow for SparkOperator...${NC}"
 # Wait for Airflow pods to be ready
 kubectl wait --for=condition=ready --timeout=600s pod -l component=scheduler -n airflow
 kubectl wait --for=condition=ready --timeout=600s pod -l component=webserver -n airflow
 
 # Get pod names
 SCHEDULER_POD=$(kubectl get pods -n airflow -l component=scheduler -o jsonpath='{.items[0].metadata.name}')
-WEBSERVER_POD=$(kubectl get pods -n airflow -l component=webserver -o jsonpath='{.items[0].metadata.name}')
 
-# Copy SparkOperator DAGs
-kubectl cp "$PROJECT_ROOT/dags/spark_operator_s3.py" airflow/$SCHEDULER_POD:/opt/airflow/dags/ -c scheduler
-kubectl cp "$PROJECT_ROOT/dags/spark_application.yaml" airflow/$SCHEDULER_POD:/opt/airflow/dags/ -c scheduler
-
-# Refresh DAGs in Airflow
+# Refresh DAGs from Git
 kubectl exec -n airflow $SCHEDULER_POD -c scheduler -- airflow dags reserialize
 
 # Unpause the SparkOperator DAG

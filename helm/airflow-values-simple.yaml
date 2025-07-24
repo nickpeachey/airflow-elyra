@@ -15,8 +15,15 @@ redis:
 
 # Disable DAG persistence - copy manually instead
 dags:
-  persistence:
-    enabled: false
+  gitSync:
+    enabled: true
+    repo: https://github.com/nickpeachey/airflow-elyra
+    branch: main
+    rev: HEAD
+    depth: 1
+    # Sync every 60 seconds
+    wait: 60
+    subPath: "dags"
 
 logs:
   persistence:

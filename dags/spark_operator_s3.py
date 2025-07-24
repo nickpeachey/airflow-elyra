@@ -12,7 +12,6 @@ This DAG demonstrates:
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.providers.cncf.kubernetes.operators.spark_kubernetes import SparkKubernetesOperator
 import tempfile
 
 
@@ -259,13 +258,10 @@ spec:
         # Clean up temp file
         os.unlink(yaml_file)
 
-# Spark job for data processing using SparkKubernetesOperator
-spark_processing_task = SparkKubernetesOperator(
+# Spark job for data processing using fallback function
+spark_processing_task = PythonOperator(
     task_id='spark_data_processing',
-    namespace='default',
-    application_file='spark_application.yaml',
-    kubernetes_conn_id='kubernetes_default',
-    do_xcom_push=False,  # Disable XCom to avoid sidecar container issues
+    python_callable=submit_spark_application,
     dag=dag,
 )
 
