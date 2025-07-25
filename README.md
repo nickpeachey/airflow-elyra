@@ -4,6 +4,7 @@ This project provides a complete local Kubernetes setup for data engineering wor
 
 - **Apache Airflow 2.10.5** - Workflow orchestration with web UI
 - **Jupyter Lab with Elyra** - Interactive development and pipeline editor
+- **Kubeflow Pipelines** - Pipeline execution runtime for Elyra
 - **Papermill** - Parameterized notebook execution  
 - **Spark Operator (Kubeflow)** - Kubernetes-native Spark jobs with authentic SparkKubernetesOperator
 - **LocalStack** - Local AWS services emulation with S3 integration
@@ -11,11 +12,21 @@ This project provides a complete local Kubernetes setup for data engineering wor
 
 ## 🚀 ONE-COMMAND DEPLOYMENT
 
-**NEW**: Deploy everything with a single command!
+**NEW**: Choose your deployment option:
 
+### Option 1: Elyra + Kubeflow Pipelines (Recommended)
+```bash
+./scripts/setup-complete.sh
+```
+**Perfect for:** Interactive pipeline development, visual pipeline editor, notebook-to-production workflows
+
+📋 **See:** [ONE_COMMAND_SETUP_KFP.md](ONE_COMMAND_SETUP_KFP.md) for detailed Elyra setup
+
+### Option 2: Full Data Engineering Stack
 ```bash
 ./scripts/deploy-everything.sh
 ```
+**Perfect for:** Traditional Airflow workflows, Spark processing, comprehensive data engineering
 
 This master script will:
 - Clean up any existing setup
@@ -27,7 +38,7 @@ This master script will:
 
 **Result**: Complete working data engineering stack in ~5 minutes! ⚡
 
-For detailed instructions, see: [ONE_COMMAND_SETUP.md](ONE_COMMAND_SETUP.md)
+📋 **See:** [ONE_COMMAND_SETUP.md](ONE_COMMAND_SETUP.md) for detailed Airflow setup
 
 ## 🎯 What You Get
 

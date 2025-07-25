@@ -4,29 +4,27 @@ metadata:
   name: jupyter-config
   namespace: jupyter
 data:
-  jupyter_notebook_config.py: |
+  jupyter_server_config.py: |
     import os
     
     # Basic configuration
-    c.NotebookApp.ip = '0.0.0.0'
-    c.NotebookApp.port = 8888
-    c.NotebookApp.open_browser = False
-    c.NotebookApp.token = os.environ.get('JUPYTER_TOKEN', '')
-    c.NotebookApp.password = ''
-    c.NotebookApp.allow_root = True
-    c.NotebookApp.notebook_dir = '/home/jovyan/work'
+    c.ServerApp.ip = '0.0.0.0'
+    c.ServerApp.port = 8888
+    c.ServerApp.open_browser = False
+    c.ServerApp.token = os.environ.get('JUPYTER_TOKEN', '')
+    c.ServerApp.password = ''
+    c.ServerApp.allow_root = True
+    c.ServerApp.root_dir = '/home/jovyan/work'
     
     # Security settings
-    c.NotebookApp.allow_origin = '*'
-    c.NotebookApp.disable_check_xsrf = True
+    c.ServerApp.allow_origin = '*'
+    c.ServerApp.disable_check_xsrf = True
     
     # Kernel settings
     c.KernelManager.autorestart = True
     
-    # Extensions
-    c.NotebookApp.nbserver_extensions = {
-        'elyra': True
-    }
+    # Enable Elyra extensions
+    c.LabServerApp.extra_labextensions_path = ['/opt/conda/share/jupyter/labextensions']
 
 ---
 apiVersion: v1
@@ -62,7 +60,8 @@ spec:
     spec:
       containers:
       - name: jupyter-lab
-        image: jupyter/all-spark-notebook:spark-3.5.0
+        image: quay.io/jupyter/scipy-notebook:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8888
           name: jupyter
@@ -75,11 +74,14 @@ spec:
           value: "yes"
         - name: CHOWN_HOME
           value: "yes"
+        - name: PYTHONPATH
+          value: "/home/jovyan/work"
         command:
         - start-notebook.sh
-        - --NotebookApp.config_file=/etc/jupyter/jupyter_notebook_config.py
-        - --NotebookApp.token=datascience123
-        - --NotebookApp.password=''
+        - --ServerApp.config_file=/etc/jupyter/jupyter_server_config.py
+        - --ServerApp.token=datascience123
+        - --ServerApp.password=''
+        - --LabApp.check_for_updates=False
         volumeMounts:
         - name: workspace
           mountPath: /home/jovyan/work
@@ -90,19 +92,8 @@ spec:
             cpu: 500m
             memory: 1Gi
           limits:
-            cpu: 2
+            cpu: "2"
             memory: 4Gi
-        # Install additional packages on startup
-        lifecycle:
-          postStart:
-            exec:
-              command:
-              - /bin/bash
-              - -c
-              - |
-                pip install --quiet papermill elyra[all] kubernetes boto3 apache-airflow-client
-                jupyter server extension enable elyra
-                jupyter lab build --dev-build=False --minimize=False
       volumes:
       - name: workspace
         persistentVolumeClaim:
@@ -110,6 +101,9 @@ spec:
       - name: config
         configMap:
           name: jupyter-config
+          items:
+          - key: jupyter_server_config.py
+            path: jupyter_server_config.py
 
 ---
 apiVersion: v1

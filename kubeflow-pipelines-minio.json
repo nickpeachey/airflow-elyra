@@ -1,0 +1,16 @@
+{
+  "display_name": "Kubeflow Pipelines",
+  "schema_name": "kfp",
+  "metadata": {
+    "api_endpoint": "http://ml-pipeline.kubeflow:8888",
+    "engine": "Argo",
+    "auth_type": "NO_AUTHENTICATION",
+    "cos_endpoint": "http://minio-service.kubeflow:9000",
+    "cos_bucket": "mlpipeline",
+    "cos_auth_type": "USER_CREDENTIALS",
+    "cos_username": "minio",
+    "cos_password": "minio123",
+    "runtime_type": "KUBEFLOW_PIPELINES",
+    "runtime_image": "jupyter-elyra:latest"
+  }
+}

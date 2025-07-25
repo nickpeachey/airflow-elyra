@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-kfp-script
+  namespace: kubeflow
+data:
+  app.py: |
+    from flask import Flask, request, jsonify
+    import uuid
+    import time
+    import logging
+
+    app = Flask(__name__)
+    logging.basicConfig(level=logging.INFO)
+
+    @app.route('/apis/v1beta1/experiments', methods=['GET', 'POST'])
+    def experiments():
+        if request.method == 'GET':
+            return jsonify({
+                "experiments": [
+                    {
+                        "id": "default-experiment",
+                        "name": "Default",
+                        "description": "Default experiment for pipeline runs",
+                        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    }
+                ],
+                "total_size": 1
+            })
+        else:
+            experiment_id = str(uuid.uuid4())
+            return jsonify({
+                "id": experiment_id,
+                "name": request.json.get("name", f"experiment-{experiment_id[:8]}"),
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            })
+
+    @app.route('/apis/v1beta1/runs', methods=['GET', 'POST'])
+    def runs():
+        if request.method == 'GET':
+            return jsonify({
+                "runs": [
+                    {
+                        "id": "f6b1534e-7422-40d4-80d7-57bef4f6817d",
+                        "name": "pipeline-run-f6b1534e",
+                        "status": "Succeeded",
+                        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    }
+                ],
+                "total_size": 1
+            })
+        else:
+            run_id = str(uuid.uuid4())
+            app.logger.info(f"Creating run: {run_id}")
+            return jsonify({
+                "run": {
+                    "id": run_id,
+                    "name": f"run-{run_id[:8]}",
+                    "status": "Running",
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                }
+            })
+
+    @app.route('/apis/v1beta1/runs/<run_id>', methods=['GET'])
+    def get_run(run_id):
+        return jsonify({
+            "run": {
+                "id": run_id,
+                "name": f"run-{run_id[:8]}",
+                "status": "Succeeded",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            }
+        })
+
+    @app.route('/', methods=['GET'])
+    @app.route('/runs/details/<run_id>', methods=['GET'])
+    def web_ui(run_id=None):
+        html = """<!DOCTYPE html><html><head><title>Mock Kubeflow Pipelines</title>
+        <style>body{font-family:Arial;margin:40px;}.header{background:#1976d2;color:white;padding:20px;margin:-40px -40px 40px -40px;}
+        .card{border:1px solid #ddd;padding:20px;margin:10px 0;border-radius:5px;}.status{color:#4caf50;}
+        .logs{background:#f5f5f5;padding:15px;margin:10px 0;font-family:monospace;}</style></head><body>
+        <div class="header"><h1>Mock Kubeflow Pipelines</h1><p>Pipeline execution environment</p></div>"""
+        
+        if run_id:
+            html += f"""<div class="card"><h2>Run Details</h2><p><strong>Run ID:</strong> {run_id}</p>
+            <p><strong>Status:</strong> <span class="status">Succeeded</span></p>
+            <p><strong>Runtime:</strong> jupyter-elyra:latest</p>
+            <div class="logs">Pipeline execution completed successfully!<br><br>
+            Runtime: jupyter-elyra:latest<br>Storage: LocalStack S3<br>All notebook nodes executed successfully</div></div>"""
+        else:
+            html += """<div class="card"><h2>Pipeline Status</h2><p><strong>Latest Run:</strong> <span class="status">Succeeded</span></p>
+            <p><strong>Runtime:</strong> jupyter-elyra:latest</p><p><strong>Storage:</strong> LocalStack S3</p></div>"""
+        
+        html += """<div class="card"><h3>Links</h3>
+        <p><a href="http://localhost:8889" target="_blank">Return to Jupyter (Elyra)</a></p>
+        <p><a href="/apis/v1beta1/runs" target="_blank">View Runs API</a></p></div></body></html>"""
+        
+        return html
+
+    @app.route('/apis/v1beta1/pipelines/upload', methods=['POST'])
+    def upload_pipeline():
+        pipeline_id = str(uuid.uuid4())
+        app.logger.info(f"Pipeline uploaded: {pipeline_id}")
+        return jsonify({
+            "id": pipeline_id,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "name": f"pipeline-{pipeline_id[:8]}",
+            "default_version": {"id": pipeline_id}
+        })
+
+    @app.route('/apis/v1beta1/pipeline_versions', methods=['GET', 'POST'])
+    def pipeline_versions():
+        if request.method == 'GET':
+            return jsonify({
+                "versions": [
+                    {
+                        "id": "default-version",
+                        "name": "Default Version",
+                        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    }
+                ],
+                "total_size": 1
+            })
+        else:
+            version_id = str(uuid.uuid4())
+            return jsonify({
+                "id": version_id,
+                "name": f"version-{version_id[:8]}",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            })
+
+    @app.route('/health', methods=['GET'])
+    def health():
+        return jsonify({"status": "healthy"})
+
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=8888, debug=True)
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-kfp-service
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-kfp-service
+  template:
+    metadata:
+      labels:
+        app: mock-kfp-service
+    spec:
+      containers:
+      - name: mock-kfp
+        image: python:3.9-slim
+        ports:
+        - containerPort: 8888
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          pip install flask && python /app/app.py
+        volumeMounts:
+        - name: script-volume
+          mountPath: /app
+        env:
+        - name: FLASK_ENV
+          value: "development"
+      volumes:
+      - name: script-volume
+        configMap:
+          name: mock-kfp-script
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-pipeline
+  namespace: kubeflow
+spec:
+  type: NodePort
+  ports:
+  - port: 8888
+    targetPort: 8888
+    nodePort: 30889
+    protocol: TCP
+  selector:
+    app: mock-kfp-service

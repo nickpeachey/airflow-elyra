@@ -1,0 +1,115 @@
+#!/bin/bash
+set -e
+
+# Configure Elyra Runtime for Real Kubeflow Pipelines
+# This script updates the Elyra runtime configuration to use real KFP
+
+echo "🔧 Configuring Elyra runtime for real Kubeflow Pipelines..."
+
+# Wait for KFP API to be ready
+wait_for_kfp_api() {
+    local timeout=300
+    local interval=10
+    local elapsed=0
+    
+    echo "⏳ Waiting for Kubeflow Pipelines API to be ready..."
+    
+    while [ $elapsed -lt $timeout ]; do
+        if curl -s --connect-timeout 5 http://localhost:8881/apis/v1beta1/healthz > /dev/null 2>&1; then
+            echo "✅ KFP API is ready!"
+            return 0
+        fi
+        
+        echo "   Still waiting... (${elapsed}s/${timeout}s)"
+        sleep $interval
+        elapsed=$((elapsed + interval))
+    done
+    
+    echo "❌ Timeout waiting for KFP API to be ready"
+    return 1
+}
+
+# Create the runtime configuration directory
+RUNTIME_DIR="$HOME/.local/share/jupyter/metadata/runtimes"
+mkdir -p "$RUNTIME_DIR"
+
+# Wait for KFP API to be ready
+wait_for_kfp_api
+
+# Create real KFP runtime configuration
+echo "📝 Creating Kubeflow Pipelines runtime configuration..."
+cat > "$RUNTIME_DIR/kubeflow-pipelines.json" << 'EOF'
+{
+  "display_name": "Kubeflow Pipelines (Real)",
+  "schema_name": "kfp",
+  "metadata": {
+    "api_endpoint": "http://localhost:8881",
+    "cos_endpoint": "http://localhost:4566",
+    "cos_username": "test",
+    "cos_password": "test123",
+    "cos_bucket": "airflow-logs",
+    "cos_auth_type": "USER_CREDENTIALS",
+    "engine": "Argo",
+    "kubernetes_pod_annotations": {},
+    "kubernetes_pod_labels": {},
+    "kubernetes_tolerations": {},
+    "kubernetes_shared_mem_size": {},
+    "mount_volumes": {},
+    "env_vars": {
+      "AWS_ACCESS_KEY_ID": "test",
+      "AWS_SECRET_ACCESS_KEY": "test123",
+      "AWS_ENDPOINT_URL": "http://localstack-service.localstack:4566",
+      "AWS_S3_ENDPOINT": "http://localstack-service.localstack:4566"
+    },
+    "runtime_image": "jupyter-elyra:latest"
+  }
+}
+EOF
+
+echo "✅ Kubeflow Pipelines runtime configuration created!"
+
+# Test the configuration
+echo "🧪 Testing KFP API connectivity..."
+
+# Test health endpoint
+if curl -s http://localhost:8881/apis/v1beta1/healthz | grep -q "commit_sha\|tag_name"; then
+    echo "✅ KFP Health Check: PASSED"
+else
+    echo "⚠️  KFP Health Check: Warning - API may not be fully ready"
+fi
+
+# Test experiments endpoint
+if curl -s http://localhost:8881/apis/v1beta1/experiments > /dev/null 2>&1; then
+    echo "✅ KFP Experiments API: ACCESSIBLE"
+else
+    echo "⚠️  KFP Experiments API: Warning - may need more time"
+fi
+
+# Test pipelines endpoint
+if curl -s http://localhost:8881/apis/v1beta1/pipelines > /dev/null 2>&1; then
+    echo "✅ KFP Pipelines API: ACCESSIBLE"
+else
+    echo "⚠️  KFP Pipelines API: Warning - may need more time"
+fi
+
+echo ""
+echo "🎉 Elyra runtime configuration complete!"
+echo ""
+echo "📊 Runtime Details:"
+echo "   • Runtime Name: Kubeflow Pipelines (Real)"
+echo "   • API Endpoint: http://localhost:8881"
+echo "   • Storage: LocalStack S3 (airflow-logs bucket)"
+echo "   • Runtime Image: jupyter-elyra:latest"
+echo ""
+echo "🔧 Next Steps:"
+echo "   1. Restart Jupyter if it's running: kubectl delete pod -l app=jupyter -n jupyter"
+echo "   2. Access Jupyter at: http://localhost:8889"
+echo "   3. Create a new pipeline in Elyra"
+echo "   4. Select 'Kubeflow Pipelines (Real)' as the runtime"
+echo "   5. Submit and monitor real pipeline execution!"
+echo ""
+echo "🌐 Monitoring URLs:"
+echo "   • KFP UI: http://localhost:8882"
+echo "   • KFP API: http://localhost:8881"
+echo "   • Jupyter: http://localhost:8889"
+echo ""

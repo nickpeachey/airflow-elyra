@@ -1,0 +1,12 @@
+{
+  "display_name": "Local Docker (Custom Image)",
+  "schema_name": "local",
+  "metadata": {
+    "runtime_image": "jupyter-elyra:latest",
+    "cos_endpoint": "",
+    "cos_username": "",
+    "cos_password": "",
+    "cos_bucket": "",
+    "cos_auth_type": "NO_CREDENTIALS"
+  }
+}

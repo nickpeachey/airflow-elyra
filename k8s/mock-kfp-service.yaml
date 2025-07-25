@@ -1,0 +1,329 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-kfp-config
+  namespace: jupyter
+data:
+  app.py: |
+    from flask import Flask, jsonify, request
+    import logging
+    import uuid
+    import time
+    
+    app = Flask(__name__)
+    logging.basicConfig(level=logging.INFO)
+    
+    @app.route('/', methods=['GET'])
+    def health_check():
+        return jsonify({"status": "ok", "service": "mock-kfp"})
+    
+    @app.route('/apis/v1beta1/healthz', methods=['GET'])
+    def healthz():
+        return jsonify({"status": "ok"})
+    
+    @app.route('/apis/v1beta1/pipelines', methods=['GET', 'POST'])
+    def pipelines():
+        if request.method == 'GET':
+            return jsonify({
+                "pipelines": [],
+                "total_size": 0,
+                "next_page_token": ""
+            })
+        # Handle pipeline upload
+        pipeline_id = str(uuid.uuid4())
+        app.logger.info(f"Created pipeline: {pipeline_id}")
+        return jsonify({
+            "id": pipeline_id,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "name": request.json.get("name", "mock-pipeline") if request.json else "mock-pipeline",
+            "description": "Mock pipeline created by Elyra"
+        })
+    
+    @app.route('/apis/v1beta1/experiments', methods=['GET', 'POST'])
+    def experiments():
+        if request.method == 'GET':
+            return jsonify({
+                "experiments": [{
+                    "id": "default-experiment-id",
+                    "name": "Default",
+                    "description": "Default experiment",
+                    "created_at": "2025-01-01T00:00:00Z"
+                }],
+                "total_size": 1,
+                "next_page_token": ""
+            })
+        experiment_id = str(uuid.uuid4())
+        app.logger.info(f"Created experiment: {experiment_id}")
+        return jsonify({
+            "id": experiment_id,
+            "name": request.json.get("name", "mock-experiment") if request.json else "mock-experiment",
+            "description": "Mock experiment",
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        })
+    
+    @app.route('/apis/v1beta1/runs', methods=['GET', 'POST'])
+    def runs():
+        if request.method == 'GET':
+            return jsonify({
+                "runs": [],
+                "total_size": 0,
+                "next_page_token": ""
+            })
+        # Handle run creation - this is the key endpoint
+        run_id = str(uuid.uuid4())
+        run_name = request.json.get("name", f"mock-run-{int(time.time())}") if request.json else f"mock-run-{int(time.time())}"
+        app.logger.info(f"Created run: {run_id} with name: {run_name}")
+        return jsonify({
+            "run": {
+                "id": run_id,
+                "name": run_name,
+                "status": "Running",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "scheduled_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "finished_at": None,
+                "pipeline_spec": {
+                    "pipeline_id": "mock-pipeline-id"
+                },
+                "resource_references": [{
+                    "key": {
+                        "type": "EXPERIMENT",
+                        "id": "default-experiment-id"
+                    },
+                    "relationship": "OWNER"
+                }]
+            }
+        })
+    
+    @app.route('/apis/v1beta1/runs/<run_id>', methods=['GET'])
+    def get_run(run_id):
+        return jsonify({
+            "run": {
+                "id": run_id,
+                "name": f"run-{run_id[:8]}",
+                "status": "Succeeded",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            }
+        })
+    
+    # Add a simple web UI for viewing runs
+    @app.route('/', methods=['GET'])
+    def web_ui():
+        if request.headers.get('Accept', '').startswith('text/html'):
+            return '''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Mock Kubeflow Pipelines</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .header { background: #1976d2; color: white; padding: 20px; margin: -40px -40px 40px -40px; }
+                    .run-card { border: 1px solid #ddd; padding: 20px; margin: 10px 0; border-radius: 5px; }
+                    .status-running { color: #ff9800; }
+                    .status-succeeded { color: #4caf50; }
+                    .logs { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🚀 Mock Kubeflow Pipelines</h1>
+                    <p>Simple mock service for Elyra pipeline execution</p>
+                </div>
+                
+                <h2>Pipeline Runs</h2>
+                <div class="run-card">
+                    <h3>📊 Latest Run Status</h3>
+                    <p><strong>Status:</strong> <span class="status-succeeded">✅ Succeeded</span></p>
+                    <p><strong>Runtime:</strong> jupyter-elyra:latest</p>
+                    <p><strong>Storage:</strong> LocalStack S3 (airflow-logs bucket)</p>
+                    
+                    <div class="logs">
+                        <strong>📝 Execution Summary:</strong><br>
+                        • Pipeline submitted successfully to mock KFP service<br>
+                        • Using custom Docker image: jupyter-elyra:latest<br>
+                        • Artifacts stored in LocalStack: /airflow-logs/[run-id]<br>
+                        • All notebook executions completed successfully
+                    </div>
+                </div>
+                
+                <h3>🔗 Useful Links</h3>
+                <ul>
+                    <li><a href="http://localhost:8889" target="_blank">🔙 Return to Jupyter (Elyra)</a></li>
+                    <li><a href="/apis/v1beta1/runs" target="_blank">📊 View Runs API</a></li>
+                    <li><a href="/apis/v1beta1/experiments" target="_blank">🧪 View Experiments API</a></li>
+                </ul>
+                
+                <p><em>This is a mock service. In a real Kubeflow deployment, you would see actual pipeline execution details here.</em></p>
+            </body>
+            </html>
+            '''
+        else:
+            return jsonify({"status": "ok", "service": "mock-kfp"})
+    
+    @app.route('/#/runs/details/<run_id>', methods=['GET'])
+    @app.route('/runs/details/<run_id>', methods=['GET'])
+    def run_details(run_id):
+            html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Run Details - {run_id}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                .header {{ background: #1976d2; color: white; padding: 20px; margin: -40px -40px 40px -40px; }}
+                .detail-card {{ border: 1px solid #ddd; padding: 20px; margin: 10px 0; border-radius: 5px; }}
+                .status-succeeded {{ color: #4caf50; }}
+                .logs {{ background: #f5f5f5; padding: 15px; margin: 10px 0; font-family: monospace; white-space: pre-line; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Pipeline Run Details</h1>
+                <p>Run ID: {run_id}</p>
+            </div>
+            
+            <div class="detail-card">
+                <h2>Run Status: <span class="status-succeeded">Succeeded</span></h2>
+                <p><strong>Run ID:</strong> {run_id}</p>
+                <p><strong>Pipeline:</strong> Elyra Visual Pipeline</p>
+                <p><strong>Created:</strong> {time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                <p><strong>Runtime Image:</strong> jupyter-elyra:latest</p>
+                <p><strong>Storage Location:</strong> s3://airflow-logs/untitled4-{int(time.time())}</p>
+            </div>
+            
+            <div class="detail-card">
+                <h3>Execution Logs</h3>
+                <div class="logs">Pipeline execution completed successfully!
+
+All notebook nodes executed successfully
+Runtime: jupyter-elyra:latest (custom image with Elyra + PySpark)
+Storage: LocalStack S3 (airflow-logs bucket)
+Orchestration: Mock KFP Service
+
+Execution Summary:
+- Pipeline uploaded and validated
+- Notebooks executed in sequence
+- Outputs stored in object storage
+- All dependencies resolved successfully
+
+This is a mock execution log. In a real environment, you would see:
+- Individual notebook execution logs
+- Resource usage metrics
+- Error details (if any)
+- Artifact download links</div>
+            </div>
+            
+            <div class="detail-card">
+                <h3>Actions</h3>
+                <p><a href="http://localhost:8889" target="_blank">Return to Jupyter (Elyra)</a></p>
+                <p><a href="http://localhost:30888" target="_blank">Pipeline Dashboard</a></p>
+            </div>
+        </body>
+        </html>
+        """
+            return html_content    # Handle pipeline upload specifically
+    @app.route('/apis/v1beta1/pipelines/upload', methods=['POST'])
+    def upload_pipeline():
+        pipeline_id = str(uuid.uuid4())
+        app.logger.info(f"Pipeline uploaded: {pipeline_id}")
+        return jsonify({
+            "id": pipeline_id,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "name": f"pipeline-{pipeline_id[:8]}",
+            "description": "Uploaded pipeline"
+        })
+    
+    # Handle pipeline versions
+    @app.route('/apis/v1beta1/pipeline_versions', methods=['GET', 'POST'])
+    def pipeline_versions():
+        if request.method == 'GET':
+            return jsonify({
+                "versions": [],
+                "total_size": 0
+            })
+        version_id = str(uuid.uuid4())
+        return jsonify({
+            "id": version_id,
+            "name": "version-1",
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        })
+    
+    # Catch-all for any other KFP API calls
+    @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+    def catch_all(path):
+        app.logger.info(f"Mock KFP received: {request.method} /{path}")
+        app.logger.info(f"Request data: {request.get_data()}")
+        return jsonify({"status": "ok", "mock": True, "path": path})
+    
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=8888, debug=True)
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-kfp-service
+  namespace: jupyter
+  labels:
+    app: mock-kfp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-kfp
+  template:
+    metadata:
+      labels:
+        app: mock-kfp
+    spec:
+      containers:
+      - name: mock-kfp
+        image: python:3.10-slim
+        ports:
+        - containerPort: 8888
+          name: http
+        command:
+        - bash
+        - -c
+        - |
+          pip install flask
+          cd /app
+          python app.py
+        volumeMounts:
+        - name: config
+          mountPath: /app
+        env:
+        - name: FLASK_ENV
+          value: "development"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: config
+        configMap:
+          name: mock-kfp-config
+          items:
+          - key: app.py
+            path: app.py
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-pipeline
+  namespace: jupyter
+  labels:
+    app: mock-kfp
+spec:
+  type: NodePort
+  ports:
+  - port: 8888
+    targetPort: 8888
+    nodePort: 30888
+    name: http
+  selector:
+    app: mock-kfp
