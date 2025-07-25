@@ -35,7 +35,7 @@ default_args = {
 
 # DAG definition
 dag = DAG(
-    'spark_operator_s3_fixed_pipeline',
+    'spark_operator_s3_fixed_pipeline_hopefull',
     default_args=default_args,
     description='PySpark data processing using SparkKubernetesOperator with S3 storage',
     schedule_interval=timedelta(hours=6),
